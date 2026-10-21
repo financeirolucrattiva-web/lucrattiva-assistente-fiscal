@@ -1,0 +1,7 @@
+# Segredos e dados locais — nunca versionar
+data/*
+!data/.gitkeep
+
+__pycache__/
+*.pyc
+.venv/

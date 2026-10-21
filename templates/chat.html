@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Assistente Fiscal Lucrattiva</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.0/marked.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/dompurify/3.0.8/purify.min.js"></script>
+</head>
+<body class="pagina-chat">
+  <aside class="barra-lateral">
+    <div class="marca-barra-lateral">
+      <img src="{{ url_for('static', filename='marca/logo.png') }}" alt="LuCrattiva" class="logo-barra-lateral">
+    </div>
+    <div class="cabecalho-barra">
+      <h1>Assistentes</h1>
+      <a href="{{ url_for('logout') }}" class="link-sair">Sair</a>
+    </div>
+    <div class="cabecalho-barra">
+      <a href="{{ url_for('dashboard_form') }}" class="link-destaque-barra">📊 Dashboard DRE/Balancete</a>
+    </div>
+    <input type="search" id="busca-agente" placeholder="Buscar assistente...">
+    <div id="lista-agentes" class="lista-agentes">Carregando...</div>
+  </aside>
+
+  <main class="area-chat">
+    <header class="cabecalho-chat">
+      <div>
+        <h2 id="nome-agente-atual">Escolha um assistente</h2>
+        <p id="descricao-agente-atual" class="descricao-agente"></p>
+      </div>
+      <button id="botao-nova-conversa" class="botao-secundario">Nova conversa</button>
+    </header>
+
+    <div id="mensagens" class="mensagens">
+      <p class="mensagem-sistema">
+        Escolha um assistente na lista ao lado pra começar. Cada assistente é especializado num assunto
+        (ex.: Simples Nacional, folha de pagamento, SPED) — a resposta não substitui a conferência de um contador.
+      </p>
+    </div>
+
+    <form id="form-enviar" class="form-enviar">
+      <textarea id="campo-mensagem" placeholder="Escreva sua pergunta..." rows="2" disabled></textarea>
+      <button type="submit" id="botao-enviar" disabled>Enviar</button>
+    </form>
+  </main>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>

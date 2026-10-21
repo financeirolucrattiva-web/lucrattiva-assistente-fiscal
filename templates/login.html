@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Assistente Fiscal Lucrattiva — entrar</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body class="pagina-login">
+  <main class="cartao-login">
+    <h1>Assistente Fiscal</h1>
+    <p class="subtitulo">Lucrattiva Contabilidade</p>
+
+    {% if not senha_configurada %}
+      <p class="aviso">Nenhuma senha configurada ainda nesta instalação — peça pra quem instalou criar <code>data/senha.txt</code>.</p>
+    {% endif %}
+
+    {% if erro %}
+      <p class="erro">{{ erro }}</p>
+    {% endif %}
+
+    <form method="post">
+      <label for="senha">Senha de acesso</label>
+      <input type="password" id="senha" name="senha" autofocus required>
+      <button type="submit">Entrar</button>
+    </form>
+
+    <p class="rodape">Uso interno do escritório. Não compartilhe dado de cliente que não precise estar aqui.</p>
+  </main>
+</body>
+</html>

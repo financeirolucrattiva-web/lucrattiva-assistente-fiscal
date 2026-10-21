@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Novo dashboard — Assistente Fiscal Lucrattiva</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body class="pagina-dashboard-form">
+  <header class="cabecalho-form">
+    <img src="{{ url_for('static', filename='marca/logo.png') }}" alt="LuCrattiva" class="logo-form">
+    <a href="{{ url_for('index') }}" class="link-voltar">← Voltar ao chat</a>
+  </header>
+
+  {% macro campo(nome, rotulo, obrigatorio=false, placeholder="0,00") %}
+    {% set s = sugestoes.get(nome) if sugestoes else none %}
+    <label class="{{ 'campo-sugerido' if s else '' }}">
+      {{ rotulo }}
+      <input type="text" name="{{ nome }}" placeholder="{{ placeholder }}" {{ "required" if obrigatorio else "" }}
+             value="{{ s.valor | numero(2) if s else '' }}">
+      {% if s %}
+        <span class="rotulo-sugestao" title="{{ s.linha }}">sugestão extraída do arquivo — confira: "{{ s.linha|truncate(60) }}"</span>
+      {% endif %}
+    </label>
+  {% endmacro %}
+
+  <main class="cartao-form">
+    <h1>Dashboard do cliente — DRE e Balancete</h1>
+    <p class="ajuda-form">
+      Preencha os valores do período (competência atual), ou envie o arquivo abaixo pra pré-preencher.
+      Os campos de "período anterior" são opcionais.
+    </p>
+
+    <fieldset class="fieldset-upload">
+      <legend>Enviar arquivo(s) de DRE/Balancete (PDF ou Excel)</legend>
+      <p class="ajuda-form">
+        Pode selecionar <strong>mais de um arquivo de uma vez</strong> (ex.: DRE e Balancete juntos). A IA
+        (Claude) lê o documento de verdade — entende tabela, coluna certa, conta agrupada — em vez de só
+        procurar texto. <strong>Sempre confira os valores em amarelo</strong> antes de gerar o dashboard;
+        mesmo lendo bem, é a sua conferência que decide o que vai pro cliente.
+      </p>
+      <form method="post" action="{{ url_for('dashboard_upload') }}" enctype="multipart/form-data" class="form-upload">
+        <input type="file" name="arquivos" accept=".pdf,.xlsx,.xls" multiple required>
+        <button type="submit" class="botao-secundario">Extrair e pré-preencher</button>
+      </form>
+
+      {% if erro_upload %}
+        <p class="erro-upload">{{ erro_upload }}</p>
+      {% endif %}
+
+      {% if nome_arquivo_enviado %}
+        <p class="ok-upload">
+          Arquivo(s) recebido(s): <strong>{{ nome_arquivo_enviado }}</strong> (método: {{ metodo_extracao or "—" }})
+          {% if sugestoes %} — {{ sugestoes|length }} conta(s) encontrada(s), destacadas em amarelo abaixo.{% endif %}
+        </p>
+        {% if erro_extracao %}
+          <p class="erro-upload">{{ erro_extracao }}</p>
+        {% endif %}
+        {% if notas_ia %}
+          <p class="notas-ia">🧠 {{ notas_ia }}</p>
+        {% endif %}
+      {% endif %}
+    </fieldset>
+
+    <form method="post" action="{{ url_for('dashboard_resultado') }}">
+      {% for nome in arquivos_salvos or [] %}
+        <input type="hidden" name="arquivo_salvo" value="{{ nome }}">
+      {% endfor %}
+      <fieldset>
+        <legend>Cliente</legend>
+        <div class="grade-campos">
+          <label class="{{ 'campo-sugerido' if cliente_nome_sugerido else '' }}">Nome do cliente
+            <input type="text" name="cliente_nome" required placeholder="Ex.: Fazenda Boa Vista Agropecuária Ltda"
+                   value="{{ cliente_nome_sugerido or '' }}">
+          </label>
+          <label>CNPJ
+            <input type="text" name="cliente_cnpj" placeholder="00.000.000/0001-00">
+          </label>
+          <label class="{{ 'campo-sugerido' if competencia_sugerida else '' }}">Competência / período
+            <input type="text" name="competencia" placeholder="Ex.: Setembro/2026" required
+                   value="{{ competencia_sugerida or '' }}">
+          </label>
+          <label>E-mail de contato <span class="campo-opcional-marca">(opcional — pro botão "Enviar por e-mail")</span>
+            <input type="email" name="cliente_email" placeholder="financeiro@cliente.com.br">
+          </label>
+          <label>WhatsApp de contato <span class="campo-opcional-marca">(opcional — pro botão "Enviar por WhatsApp")</span>
+            <input type="text" name="cliente_whatsapp" placeholder="(65) 99999-9999">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>DRE — Demonstração do Resultado</legend>
+        <div class="grade-campos">
+          {{ campo("receita_bruta", "Receita bruta (R$)", obrigatorio=true) }}
+          {{ campo("deducoes", "Deduções da receita — impostos sobre venda (R$)") }}
+          {{ campo("cmv", "CMV / CPV — custo das mercadorias/serviços vendidos (R$)") }}
+          {{ campo("despesas_operacionais", "Despesas operacionais totais (R$)") }}
+          {{ campo("resultado_financeiro", "Resultado financeiro — receitas (−) despesas financeiras (R$)", placeholder="0,00 (negativo se for despesa líquida)") }}
+          {{ campo("irpj_csll", "IRPJ/CSLL do período (R$)") }}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Balancete — Posição Patrimonial</legend>
+        <div class="grade-campos">
+          {{ campo("ativo_circulante", "Ativo circulante (R$)", obrigatorio=true) }}
+          {{ campo("ativo_nao_circulante", "Ativo não circulante (R$)") }}
+          {{ campo("passivo_circulante", "Passivo circulante (R$)", obrigatorio=true) }}
+          {{ campo("passivo_nao_circulante", "Passivo não circulante (R$)") }}
+          {{ campo("patrimonio_liquido", "Patrimônio líquido (R$)") }}
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Comparação com período anterior (opcional)</legend>
+        <div class="grade-campos">
+          <label>Receita líquida do período anterior (R$)
+            <input type="text" name="receita_liquida_anterior" placeholder="deixe em branco se não tiver">
+          </label>
+          <label>Lucro líquido do período anterior (R$)
+            <input type="text" name="lucro_liquido_anterior" placeholder="deixe em branco se não tiver">
+          </label>
+        </div>
+      </fieldset>
+
+      <fieldset>
+        <legend>Comentário do contador (opcional)</legend>
+        <div class="linha-sugerir-comentario">
+          <button type="button" id="botao-sugerir-comentario" class="botao-secundario">✨ Sugerir com IA</button>
+          <span id="status-sugestao-comentario" class="status-sugestao"></span>
+        </div>
+        <textarea name="comentario" id="campo-comentario" rows="3" placeholder="Ex.: Mês com margem estável, atenção ao aumento de despesas administrativas..."></textarea>
+        <p class="ajuda-form">A sugestão é só um rascunho a partir dos números preenchidos acima — releia e edite antes de gerar o dashboard, nunca é enviada ao cliente sem revisão.</p>
+      </fieldset>
+
+      <button type="submit" class="botao-gerar">Gerar dashboard</button>
+    </form>
+  </main>
+
+  <script>
+    document.getElementById("botao-sugerir-comentario").addEventListener("click", async () => {
+      const botao = document.getElementById("botao-sugerir-comentario");
+      const status = document.getElementById("status-sugestao-comentario");
+      const campoComentario = document.getElementById("campo-comentario");
+
+      const campos = [
+        "receita_bruta", "deducoes", "cmv", "despesas_operacionais", "resultado_financeiro", "irpj_csll",
+        "ativo_circulante", "ativo_nao_circulante", "passivo_circulante", "passivo_nao_circulante", "patrimonio_liquido",
+      ];
+      const dados = {};
+      for (const nome of campos) {
+        const el = document.querySelector(`[name="${nome}"]`);
+        dados[nome] = el ? el.value.replace(/\./g, "").replace(",", ".") : "";
+      }
+
+      botao.disabled = true;
+      status.textContent = "Gerando sugestão...";
+      try {
+        const resposta = await fetch("{{ url_for('api_dashboard_comentario') }}", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(dados),
+        });
+        const json = await resposta.json();
+        if (!resposta.ok) {
+          status.textContent = `Erro: ${json.erro || "falha desconhecida."}`;
+        } else {
+          campoComentario.value = json.comentario;
+          status.textContent = "Sugestão gerada — revise antes de gerar o dashboard.";
+        }
+      } catch (erro) {
+        status.textContent = "Erro de conexão com o servidor.";
+      } finally {
+        botao.disabled = false;
+      }
+    });
+  </script>
+</body>
+</html>

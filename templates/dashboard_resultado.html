@@ -1,0 +1,305 @@
+<!doctype html>
+<html lang="pt-br">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Dashboard {{ cliente_nome }} — {{ competencia }}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='estilo.css') }}">
+</head>
+<body class="pagina-dashboard">
+  <div class="viz-root dashboard-painel">
+
+    <header class="dash-cabecalho">
+      <div class="dash-logo-caixa">
+        <img src="{{ url_for('static', filename='marca/logo.png') }}" alt="LuCrattiva" class="dash-logo">
+      </div>
+      <div class="dash-cliente">
+        <h1>{{ cliente_nome }}</h1>
+        <p>{% if cliente_cnpj %}{{ cliente_cnpj }} · {% endif %}Competência: {{ competencia }}</p>
+      </div>
+      <div class="dash-acoes no-print">
+        {% if link_mailto %}
+          <a href="{{ link_mailto }}" class="botao-primario">✉️ E-mail ({{ cliente_email }})</a>
+        {% endif %}
+        {% if link_whatsapp %}
+          <a href="{{ link_whatsapp }}" target="_blank" rel="noopener" class="botao-primario botao-whatsapp">📱 WhatsApp ({{ cliente_whatsapp }})</a>
+        {% endif %}
+        {% for nome in arquivos_originais %}
+          <a href="{{ url_for('dashboard_arquivo_original', nome_arquivo=nome) }}" class="botao-secundario botao-documento">📎 Documento original</a>
+        {% endfor %}
+        <button onclick="window.print()" class="botao-secundario">Imprimir / Salvar PDF</button>
+        <a href="{{ url_for('dashboard_form') }}" class="botao-secundario">Novo dashboard</a>
+      </div>
+      {% if arquivos_originais and (link_mailto or link_whatsapp) %}
+        <p class="dica-anexo no-print">📎 E-mail e WhatsApp não anexam arquivo automaticamente (limitação do
+          link, não dá pra contornar) — baixe o "Documento original" aqui em cima e anexe à mão na janela que
+          abrir.</p>
+      {% endif %}
+    </header>
+
+    {% if not link_mailto and not link_whatsapp %}
+      <div class="alerta-balancete no-print">
+        <span>Nenhum e-mail nem WhatsApp de contato foi preenchido no formulário, então não há botão de envio
+        aqui em cima. <a href="{{ url_for('dashboard_form') }}">Volte ao formulário</a>, preencha "E-mail de
+        contato" e/ou "WhatsApp de contato" (perto do nome do cliente) e gere o dashboard de novo.</span>
+      </div>
+    {% endif %}
+
+    {% if not balancete.balancete_fechado %}
+    <div class="alerta-balancete">
+      <span>O balancete não fechou: Ativo (R$ {{ balancete.ativo_total | moeda }}) difere de Passivo + PL
+      ({{ balancete.passivo_mais_pl | moeda }}) em {{ balancete.diferenca_fechamento | moeda }}.
+      Confira os valores digitados antes de enviar ao cliente.</span>
+    </div>
+    {% endif %}
+
+    <section class="grade-kpi">
+      <div class="kpi-tile">
+        <span class="kpi-rotulo">Receita Líquida</span>
+        <span class="kpi-valor">{{ dre.receita_liquida | moeda }}</span>
+        {% if variacao_receita is not none %}
+          <span class="kpi-delta {{ 'kpi-delta-bom' if variacao_receita >= 0 else 'kpi-delta-ruim' }}">
+            {{ '▲' if variacao_receita >= 0 else '▼' }} {{ variacao_receita | abs | percentual }} vs mês anterior
+          </span>
+        {% endif %}
+      </div>
+      <div class="kpi-tile kpi-destaque">
+        <span class="kpi-rotulo">Lucro Líquido</span>
+        <span class="kpi-valor">{{ dre.lucro_liquido | moeda }}</span>
+        {% if variacao_lucro is not none %}
+          <span class="kpi-delta {{ 'kpi-delta-bom' if variacao_lucro >= 0 else 'kpi-delta-ruim' }}">
+            {{ '▲' if variacao_lucro >= 0 else '▼' }} {{ variacao_lucro | abs | percentual }} vs mês anterior
+          </span>
+        {% endif %}
+      </div>
+      <div class="kpi-tile">
+        <span class="kpi-rotulo">Margem Líquida</span>
+        <span class="kpi-valor">{{ dre.margem_liquida | percentual }}</span>
+      </div>
+      <div class="kpi-tile">
+        <span class="kpi-rotulo">Margem Bruta</span>
+        <span class="kpi-valor">{{ dre.margem_bruta | percentual }}</span>
+      </div>
+      <div class="kpi-tile">
+        <span class="kpi-rotulo">Liquidez Corrente</span>
+        <span class="kpi-valor">{{ balancete.liquidez_corrente | numero(2) }}</span>
+      </div>
+      <div class="kpi-tile">
+        <span class="kpi-rotulo">Patrimônio Líquido</span>
+        <span class="kpi-valor">{{ balancete.patrimonio_liquido | moeda }}</span>
+      </div>
+    </section>
+
+    {% if grafico_tendencia %}
+    <section class="dash-cartao dash-tendencia">
+      <h2>Tendência — Receita Líquida e Lucro Líquido</h2>
+      <svg viewBox="0 0 {{ grafico_tendencia.largura }} {{ grafico_tendencia.altura }}" class="svg-tendencia" preserveAspectRatio="none">
+        {% if grafico_tendencia.mostra_linha_zero %}
+          <line x1="44" y1="{{ grafico_tendencia.y_linha_zero }}" x2="{{ grafico_tendencia.largura - 16 }}" y2="{{ grafico_tendencia.y_linha_zero }}" class="linha-zero" />
+        {% endif %}
+        <path d="{{ grafico_tendencia.caminho_receita }}" class="linha-tendencia linha-receita" />
+        <path d="{{ grafico_tendencia.caminho_lucro }}" class="linha-tendencia linha-lucro" />
+        {% for x, y in grafico_tendencia.pontos_receita %}
+          <circle cx="{{ x }}" cy="{{ y }}" r="4" class="ponto-tendencia ponto-receita" />
+        {% endfor %}
+        {% for x, y in grafico_tendencia.pontos_lucro %}
+          <circle cx="{{ x }}" cy="{{ y }}" r="4" class="ponto-tendencia ponto-lucro" />
+        {% endfor %}
+      </svg>
+      <div class="rotulos-x-tendencia">
+        {% for rotulo in grafico_tendencia.rotulos_x %}<span>{{ rotulo }}</span>{% endfor %}
+      </div>
+      <div class="legenda-composicao">
+        <span><i class="ponto" style="background: var(--marca-verde)"></i> Receita líquida</span>
+        <span><i class="ponto" style="background: var(--marca-dourado)"></i> Lucro líquido</span>
+      </div>
+    </section>
+    {% endif %}
+
+    {% if tabela_comparativa and tabela_comparativa|length > 1 %}
+    <section class="dash-cartao">
+      <h2>Comparativo histórico por período</h2>
+      {% if avisos_tendencia %}
+        <div class="avisos-tendencia">
+          {% for aviso in avisos_tendencia %}
+            <p class="aviso-tendencia">{{ aviso }}</p>
+          {% endfor %}
+        </div>
+      {% endif %}
+      <div class="tabela-comparativa-historico-wrap">
+        <table class="tabela-comparativa-historico">
+          <thead>
+            <tr>
+              <th>Competência</th>
+              <th>Receita líquida</th>
+              <th>Lucro líquido</th>
+              <th>Margem líquida</th>
+              <th>Patrimônio líquido</th>
+              <th>Liquidez corrente</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for linha in tabela_comparativa %}
+            <tr>
+              <td>{{ linha.competencia }}</td>
+              <td>{{ linha.receita_liquida | moeda }}
+                {% if linha.receita_liquida_variacao is not none %}
+                  <br><span class="{{ 'variacao-boa' if linha.receita_liquida_variacao >= 0 else 'variacao-ruim' }}">{{ '▲' if linha.receita_liquida_variacao >= 0 else '▼' }} {{ linha.receita_liquida_variacao | abs | percentual }}</span>
+                {% endif %}
+              </td>
+              <td>{{ linha.lucro_liquido | moeda }}
+                {% if linha.lucro_liquido_variacao is not none %}
+                  <br><span class="{{ 'variacao-boa' if linha.lucro_liquido_variacao >= 0 else 'variacao-ruim' }}">{{ '▲' if linha.lucro_liquido_variacao >= 0 else '▼' }} {{ linha.lucro_liquido_variacao | abs | percentual }}</span>
+                {% endif %}
+              </td>
+              <td>{{ linha.margem_liquida | percentual }}</td>
+              <td>{{ linha.patrimonio_liquido | moeda }}</td>
+              <td>{{ linha.liquidez_corrente | numero(2) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
+    {% endif %}
+
+    <section class="dash-duas-colunas">
+      <div class="dash-cartao">
+        <h2>Pra onde foi cada R$ 1,00 de receita</h2>
+        {% if composicao %}
+        <div class="donut-wrap">
+          <svg viewBox="0 0 200 200" class="donut-svg">
+            <circle cx="100" cy="100" r="70" fill="none" stroke="var(--viz-grade)" stroke-width="28" />
+            {% set circ = 439.82 %}
+            {% set ns = namespace(acumulado=0) %}
+            {% for fatia in composicao %}
+              <circle cx="100" cy="100" r="70" fill="none" stroke="{{ fatia.cor }}" stroke-width="28"
+                stroke-dasharray="{{ (fatia.fracao*circ)|round(1) }} {{ (circ - fatia.fracao*circ)|round(1) }}"
+                stroke-dashoffset="{{ (-ns.acumulado*circ)|round(1) }}"
+                transform="rotate(-90 100 100)" stroke-linecap="butt" />
+              {% set ns.acumulado = ns.acumulado + fatia.fracao %}
+            {% endfor %}
+          </svg>
+          <div class="donut-centro">
+            <span class="donut-centro-valor">{{ dre.margem_liquida | percentual }}</span>
+            <span class="donut-centro-rotulo">margem líquida</span>
+          </div>
+        </div>
+        <div class="legenda-composicao">
+          {% for fatia in composicao %}
+            <span><i class="ponto" style="background: {{ fatia.cor }}"></i> {{ fatia.rotulo }}: {{ fatia.valor | moeda }} ({{ fatia.fracao | percentual }})</span>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="dash-texto-metrica">Sem receita líquida positiva no período — nada pra compor.</p>
+        {% endif %}
+      </div>
+
+      <div class="dash-cartao">
+        <h2>Liquidez Corrente</h2>
+        <div class="gauge-wrap">
+          <svg viewBox="0 0 200 110" class="gauge-svg">
+            <path d="{{ gauge_liquidez.caminho_fundo }}" fill="none" stroke="var(--viz-grade)" stroke-width="16" stroke-linecap="round" />
+            <path d="{{ gauge_liquidez.caminho_valor }}" fill="none" stroke="{{ gauge_liquidez.cor }}" stroke-width="16" stroke-linecap="round" />
+          </svg>
+          <div class="gauge-valor">
+            {{ balancete.liquidez_corrente | numero(2) }}
+            {% if gauge_liquidez.estourou_escala %}<span class="gauge-nota">(acima da escala)</span>{% endif %}
+          </div>
+        </div>
+        <p class="dash-texto-metrica">
+          {% if balancete.liquidez_corrente is none %}
+            Sem passivo circulante informado — não dá pra calcular.
+          {% elif balancete.liquidez_corrente < 1 %}
+            Abaixo de 1: o ativo circulante não cobre o passivo circulante no curto prazo — atenção.
+          {% elif balancete.liquidez_corrente < 1.5 %}
+            Entre 1 e 1,5: cobre o passivo circulante, mas com folga apertada.
+          {% else %}
+            Acima de 1,5: folga confortável entre ativo e passivo circulante.
+          {% endif %}
+        </p>
+      </div>
+    </section>
+
+    <section class="dash-duas-colunas">
+      <div class="dash-cartao">
+        <h2>DRE — Composição do Resultado</h2>
+        {% set base = dre.receita_bruta if dre.receita_bruta > 0 else 1 %}
+        {% for rotulo, valor, estilo in [
+          ("Receita Bruta", dre.receita_bruta, "barra-receita"),
+          ("(−) Deduções", -dre.deducoes, "barra-deducao"),
+          ("= Receita Líquida", dre.receita_liquida, "barra-subtotal"),
+          ("(−) CMV/CPV", -dre.cmv, "barra-deducao"),
+          ("= Lucro Bruto", dre.lucro_bruto, "barra-subtotal"),
+          ("(−) Despesas Operacionais", -dre.despesas_operacionais, "barra-deducao"),
+          ("= Resultado Operacional", dre.resultado_operacional, "barra-subtotal"),
+          ("(+/−) Resultado Financeiro", dre.resultado_financeiro, "barra-deducao"),
+          ("(−) IRPJ/CSLL", -dre.irpj_csll, "barra-deducao"),
+          ("= Lucro Líquido", dre.lucro_liquido, "barra-final"),
+        ] %}
+        <div class="linha-dre">
+          <span class="linha-dre-rotulo">{{ rotulo }}</span>
+          <div class="linha-dre-trilho">
+            <div class="linha-dre-barra {{ estilo }}" style="width: {{ [((valor | abs) / base * 100), 100] | min }}%"></div>
+          </div>
+          <span class="linha-dre-valor">{{ valor | moeda }}</span>
+        </div>
+        {% endfor %}
+      </div>
+
+      <div class="dash-cartao">
+        <h2>Balancete — Posição Patrimonial</h2>
+
+        <h3 class="dash-subtitulo">Ativo — {{ balancete.ativo_total | moeda }}</h3>
+        <div class="barra-composicao">
+          <div class="seg seg-verde" style="width: {{ (balancete.ativo_circulante / balancete.ativo_total * 100) if balancete.ativo_total else 0 }}%">
+            <span>Circulante</span>
+          </div>
+          <div class="seg seg-verde-claro" style="width: {{ (balancete.ativo_nao_circulante / balancete.ativo_total * 100) if balancete.ativo_total else 0 }}%">
+            <span>Não circulante</span>
+          </div>
+        </div>
+        <div class="legenda-composicao">
+          <span><i class="ponto seg-verde"></i> Circulante: {{ balancete.ativo_circulante | moeda }}</span>
+          <span><i class="ponto seg-verde-claro"></i> Não circulante: {{ balancete.ativo_nao_circulante | moeda }}</span>
+        </div>
+
+        <h3 class="dash-subtitulo">Passivo + Patrimônio Líquido — {{ balancete.passivo_mais_pl | moeda }}</h3>
+        <div class="barra-composicao">
+          <div class="seg seg-dourado" style="width: {{ (balancete.passivo_circulante / balancete.passivo_mais_pl * 100) if balancete.passivo_mais_pl else 0 }}%">
+            <span>Passivo circ.</span>
+          </div>
+          <div class="seg seg-dourado-claro" style="width: {{ (balancete.passivo_nao_circulante / balancete.passivo_mais_pl * 100) if balancete.passivo_mais_pl else 0 }}%">
+            <span>Passivo não circ.</span>
+          </div>
+          <div class="seg seg-cinza" style="width: {{ (balancete.patrimonio_liquido / balancete.passivo_mais_pl * 100) if balancete.passivo_mais_pl else 0 }}%">
+            <span>PL</span>
+          </div>
+        </div>
+        <div class="legenda-composicao">
+          <span><i class="ponto seg-dourado"></i> Passivo circulante: {{ balancete.passivo_circulante | moeda }}</span>
+          <span><i class="ponto seg-dourado-claro"></i> Passivo não circulante: {{ balancete.passivo_nao_circulante | moeda }}</span>
+          <span><i class="ponto seg-cinza"></i> Patrimônio líquido: {{ balancete.patrimonio_liquido | moeda }}</span>
+        </div>
+
+        <h3 class="dash-subtitulo">Endividamento</h3>
+        <p class="dash-texto-metrica">
+          {{ balancete.endividamento | percentual }} do ativo total é financiado por capital de terceiros
+          (passivo circulante + não circulante).
+        </p>
+      </div>
+    </section>
+
+    {% if comentario %}
+    <section class="dash-comentario">
+      <h2>Comentário do contador</h2>
+      <p>{{ comentario }}</p>
+    </section>
+    {% endif %}
+
+    <footer class="dash-rodape no-print">
+      Gerado pelo Assistente Fiscal Lucrattiva — valores de preenchimento manual, confira antes de enviar ao cliente.
+    </footer>
+  </div>
+</body>
+</html>
